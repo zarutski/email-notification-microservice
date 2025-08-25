@@ -1,5 +1,7 @@
 package com.learn.self.kafka.product.email.notification.config;
 
+import com.learn.self.kafka.product.email.notification.exception.NonRetriableException;
+import com.learn.self.kafka.product.email.notification.exception.RetriableException;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
@@ -15,6 +17,7 @@ import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import org.springframework.kafka.support.serializer.JsonSerializer;
+import org.springframework.util.backoff.FixedBackOff;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -43,7 +46,13 @@ public class KafkaConfig {
     public ConcurrentKafkaListenerContainerFactory<String, Object> kafkaListenerContainerFactory(
             ConsumerFactory<String, Object> consumerFactory,
             KafkaTemplate<String, Object> kafkaTemplate) {
-        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate)); // defines consumer behavior when deserialization error occurs - publish failed messages to DLT
+        // defines consumer behavior when deserialization error occurs - publish failed messages to DLT via kafka template;
+        // with FixedBackOff (3 sec interval, 3 retries before sending to DLT)
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(new DeadLetterPublishingRecoverer(kafkaTemplate),
+                new FixedBackOff(3000, 3));
+        errorHandler.addNotRetryableExceptions(NonRetriableException.class); // marks listed exceptions as non-retriable: if thrown, no retries will be attempted, message goes directly to DLT
+        errorHandler.addRetryableExceptions(RetriableException.class); // marks listed exceptions as retriable: if thrown, handler will retry processing message according to retry policy
+
         ConcurrentKafkaListenerContainerFactory<String, Object> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory);
         factory.setCommonErrorHandler(errorHandler); // sets custom error handler (setup to resent unprocessed messages to DLT)
