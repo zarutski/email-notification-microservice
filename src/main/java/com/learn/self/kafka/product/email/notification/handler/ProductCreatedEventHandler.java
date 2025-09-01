@@ -16,8 +16,7 @@ import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 @Component
-@KafkaListener(topics = "product-created-events-topic")
-// subscribes class to Kafka topics; routes messages to @KafkaHandler methods
+@KafkaListener(topics = "product-created-events-topic") // subscribes class to Kafka topics; routes messages to @KafkaHandler methods
 public class ProductCreatedEventHandler {
 
     private final Logger LOGGER = LoggerFactory.getLogger(this.getClass());
@@ -31,7 +30,7 @@ public class ProductCreatedEventHandler {
     @KafkaHandler
     // used inside a @KafkaListener class; routes consumed messages to this method based on the payload type (ProductCreatedEvent messages only in this case)
     public void handle(ProductCreatedEvent createdEvent) {
-        LOGGER.info("Received event: {}", createdEvent.getTitle());
+        LOGGER.info("Received event: {}, productId: {}", createdEvent.getTitle(), createdEvent.getProductId());
 
         // simulate external service call (for testing retry)
         String url = "http://localhost:8090/response/200";
